@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+dist/
+*.log
+.DS_Store
+.pytest_cache/
+artifacts/
+coverage/
+.vercel/
+web/.env.local
+web/.env*.local
