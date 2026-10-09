@@ -5,8 +5,13 @@ dist/
 *.log
 .DS_Store
 .pytest_cache/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
 artifacts/
 coverage/
 .vercel/
+.env
+.env.local
 web/.env.local
 web/.env*.local
