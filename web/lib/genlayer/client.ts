@@ -78,11 +78,39 @@ export function isConfigured(): boolean {
   return Boolean(STUDIONET.contractAddress);
 }
 
+/**
+ * EIP-1193 providers (Rabby, Zerion, WalletConnect, …) commonly reject with
+ * plain objects like { code, message } instead of Error instances. Serialize
+ * those properly so the UI never shows "[object Object]".
+ */
+export function stringifyError(e: unknown): string {
+  if (e instanceof Error) return e.message || String(e);
+  if (typeof e === "string") return e;
+  if (e !== null && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    for (const key of ["message", "reason", "shortMessage", "details"]) {
+      if (typeof o[key] === "string" && (o[key] as string).length > 0) {
+        const rest = typeof o["code"] !== "undefined" ? ` (code ${String(o["code"])})` : "";
+        return `${o[key] as string}${rest}`;
+      }
+    }
+    try {
+      const json = JSON.stringify(o);
+      if (json !== "{}") return json.slice(0, 300);
+    } catch { /* circular — fall through */ }
+  }
+  return String(e);
+}
+
 export function humanTxError(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e);
-  if (/user rejected|rejected/i.test(msg)) return "Signature rejected in wallet.";
+  if (typeof console !== "undefined" && typeof process !== "undefined" && process.env.NODE_ENV !== "production") {
+    // Keep the raw rejection in devtools — the UI string is lossy by design.
+    console.error("[vouch] tx failure:", e);
+  }
+  const msg = stringifyError(e);
+  if (/user rejected|rejected|denied/i.test(msg)) return "Signature rejected in wallet.";
   if (/insufficient/i.test(msg)) return "Insufficient funds for value + fees.";
   if (/UNDETERMINED/i.test(msg)) return "Validators could not agree — retry verification.";
   if (/\[EXPECTED\]/i.test(msg)) return msg.replace(/.*\[EXPECTED\]\s*/i, "");
-  return msg.slice(0, 200);
+  return msg.slice(0, 300);
 }

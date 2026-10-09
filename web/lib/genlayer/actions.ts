@@ -19,8 +19,11 @@ async function write(
   onStage("signing");
   let tx: string;
   try {
-    // Binds the browser wallet to StudioNet before signing (official genlayer-js pattern).
-    await client.connect("studionet");
+    // NOTE: deliberately NOT calling client.connect(). The SDK's connect is
+    // MetaMask-coupled: it talks to window.ethereum instead of the configured
+    // provider and requires a GenLayer Snap (wallet_getSnaps), so it fails on
+    // Rabby, Zerion and WalletConnect. Our wallet layer already guarantees an
+    // authorized account on the StudioNet chain before any write.
     tx = (await client.writeContract({
       address: STUDIONET.contractAddress as `0x${string}`,
       functionName,

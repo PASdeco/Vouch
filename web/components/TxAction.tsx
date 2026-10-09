@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { TxStage } from "@/lib/genlayer/client";
+import { stringifyError } from "@/lib/genlayer/client";
 
 const LABEL: Record<TxStage, string> = {
   signing: "Waiting for signature…",
@@ -26,7 +27,7 @@ export function useTxAction() {
       return r;
     } catch (e) {
       setStage("failed");
-      setError(e instanceof Error ? e.message : String(e));
+      setError(stringifyError(e));
       throw e;
     }
   };
