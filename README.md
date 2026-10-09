@@ -7,7 +7,7 @@
 - **Contract (StudioNet):** `0xab8E0Be92141F7bD267dC88E6904aA15519B9650` — explorer: https://explorer-studio.genlayer.com
 - **Network:** StudioNet RPC `https://studio.genlayer.com/api`, chain `61999` (demo only, no real funds).
 - **Frontend:** `web/` (Next.js App Router + TS + Tailwind). Mock mode by default; connect a wallet for live reads/writes.
-- **Live URL:** https://web-3df7wxy46-a4bailout-2004s-projects.vercel.app — NOTE: Vercel Deployment Protection (login wall) is currently ON. Make it public in dashboard: Project `web` → Settings → Deployment Protection → disable Vercel Authentication.
+- **Live URL:** — NOTE: Vercel Deployment Protection (login wall) is currently ON. Make it public in dashboard: Project `web` → Settings → Deployment Protection → disable Vercel Authentication.
 
 ## Run in 10 minutes
 ```bash
