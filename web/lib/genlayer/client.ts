@@ -110,6 +110,7 @@ export function humanTxError(e: unknown): string {
   const msg = stringifyError(e);
   if (/user rejected|rejected|denied/i.test(msg)) return "Signature rejected in wallet.";
   if (/insufficient/i.test(msg)) return "Insufficient funds for value + fees.";
+  if (/FINISHED_WITH_ERROR/i.test(msg)) return "Contract execution failed — see details.";
   if (/UNDETERMINED/i.test(msg)) return "Validators could not agree — retry verification.";
   if (/\[EXPECTED\]/i.test(msg)) return msg.replace(/.*\[EXPECTED\]\s*/i, "");
   return msg.slice(0, 300);

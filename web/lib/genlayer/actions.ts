@@ -37,14 +37,45 @@ async function write(
   }
   onStage("submitted", tx);
   onStage("awaiting-consensus", tx);
+  let receipt: unknown;
   try {
-    await client.waitForTransactionReceipt({ hash: tx as Hash, status: TransactionStatus.ACCEPTED, interval: 5_000, retries: 120 });
+    receipt = await client.waitForTransactionReceipt({ hash: tx as Hash, status: TransactionStatus.ACCEPTED, interval: 5_000, retries: 120 });
   } catch (e) {
     onStage("failed", tx);
     throw new Error(humanTxError(e));
   }
+  // Consensus ACCEPTED does not mean execution succeeded: a reverted call
+  // (e.g. past deadline) still reaches consensus with status "rollback".
+  // Surface the contract's own error message instead of reporting success.
+  const execError = findExecutionError(receipt);
+  if (execError) {
+    onStage("failed", tx);
+    throw new Error(humanTxError(execError));
+  }
   onStage("finalized", tx);
   return { tx, url: explorerTxUrl(tx) };
+}
+
+/** Extracts a contract execution failure from a transaction receipt, if any. */
+function findExecutionError(receipt: unknown): unknown {
+  if (!receipt || typeof receipt !== "object") return null;
+  const r = receipt as Record<string, unknown>;
+  const cd = r.consensus_data as Record<string, unknown> | undefined;
+  const lr = cd?.leader_receipt as unknown;
+  const entries = Array.isArray(lr) ? lr : lr ? [lr] : [];
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const result = (entry as Record<string, unknown>).result as Record<string, unknown> | undefined;
+    if (result && (result.status === "rollback" || result.status === "error")) {
+      return result.payload ?? result;
+    }
+  }
+  const name = r.txExecutionResultName;
+  if (name === "FINISHED_WITH_ERROR") return name;
+  if (typeof name === "string" && /ERROR|FAIL|REVERT|ROLLBACK/.test(name) && !/SUCCESS/.test(name)) {
+    return name;
+  }
+  return null;
 }
 
 export const dealActions = {

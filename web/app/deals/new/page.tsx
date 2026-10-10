@@ -1,25 +1,32 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@/lib/wallet";
 import { dealActions } from "@/lib/genlayer/actions";
 import { isConfigured } from "@/lib/genlayer/client";
 import { useTxAction, TxStatus } from "@/components/TxAction";
+import { useToast } from "@/components/Toast";
 import { explorerTxUrl } from "@/lib/chain";
 
 const CHIPS = ["Mention product", "Show on camera", "Disclose #ad", "Stay live N days"];
 const PLATFORMS = ["YouTube", "TikTok", "X", "Instagram"];
 
+function toISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function Form() {
   const q = useSearchParams();
+  const router = useRouter();
+  const toast = useToast();
   const { address, provider } = useWallet();
   const [brief, setBrief] = useState(q.get("brief") ?? "");
   const [creator, setCreator] = useState(q.get("creator") ?? "");
   const [platform, setPlatform] = useState("YouTube");
   const [amount, setAmount] = useState(q.get("amount") ?? "0.05");
   const [liveDays, setLiveDays] = useState(30);
-  const [deadline, setDeadline] = useState("");
+  const [deadline, setDeadline] = useState(() => toISODate(new Date(Date.now() + 30 * 864e5)));
   const [step, setStep] = useState<"edit" | "review">("edit");
   const { stage, tx, error, run } = useTxAction();
 
@@ -28,10 +35,20 @@ function Form() {
   const submit = async () => {
     if (!address || !provider) throw new Error("Connect a wallet first.");
     const wei = BigInt(Math.floor(Number(amount) * 1e18));
-    const dl = Math.floor(new Date(deadline).getTime() / 1000);
+    if (!(wei > 0n)) throw new Error("Amount must be greater than 0.");
+    // A date-only deadline means midnight; by evening that is already past and
+    // the contract reverts. Interpret it as end of the selected day instead.
+    const [y, m, d] = deadline.split("-").map(Number);
+    if (!y || !m || !d) throw new Error("Pick a valid deadline date.");
+    const dl = Math.floor(new Date(y, m - 1, d, 23, 59, 59).getTime() / 1000);
+    if (dl <= Math.floor(Date.now() / 1000)) {
+      throw new Error("Deadline must be in the future — pick tomorrow or later.");
+    }
     await run((onStage) =>
       dealActions.createDeal({ address, provider }, { creator, brief, platform, deadline: dl, liveDays, amountWei: wei }, onStage),
     );
+    toast("Deal created — funds locked in escrow.");
+    router.push("/");
   };
 
   return (
@@ -56,7 +73,7 @@ function Form() {
             <label style={{ display: "grid", gap: 6 }}>Amount (GEN)<input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.05" required style={{ minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px" }} /></label>
             <label style={{ display: "grid", gap: 6 }}>Min live days<input type="number" min={1} max={365} value={liveDays} onChange={(e) => setLiveDays(Number(e.target.value))} style={{ minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px" }} /></label>
           </div>
-          <label style={{ display: "grid", gap: 6 }}>Deadline<input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px" }} /></label>
+          <label style={{ display: "grid", gap: 6 }}>Deadline<input type="date" value={deadline} min={toISODate(new Date())} onChange={(e) => setDeadline(e.target.value)} required style={{ minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px" }} /><span style={{ fontSize: 12, color: "var(--ink-muted)" }}>Counts until end of the selected day. Must be a future date.</span></label>
           <button className="btn btn-accent" type="submit">Review</button>
         </form>
       ) : (
