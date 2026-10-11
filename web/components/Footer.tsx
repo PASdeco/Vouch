@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { Logo } from "./Logo";
 
 export function Footer() {
   return (
     <footer style={{ borderTop: "1px solid var(--border)", marginTop: 48 }}>
       <div className="container-vouch" style={{ paddingTop: 24, paddingBottom: 24, display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
-        <span className="font-display" style={{ fontWeight: 700 }}>
-          Vouch<span style={{ color: "var(--accent)" }}>.</span>
+        <span className="font-display" style={{ fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Logo size={22} />
+          <span>Vouch<span style={{ color: "var(--accent)" }}>.</span></span>
         </span>
         <nav aria-label="Footer" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <Link href="/how-it-works">How it works</Link>

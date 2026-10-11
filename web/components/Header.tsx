@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 import { ConnectWallet } from "./ConnectWallet";
 
@@ -10,8 +11,9 @@ export function Header() {
   return (
     <header style={{ borderBottom: "1px solid var(--border)" }}>
       <div className="container-vouch" style={{ display: "flex", alignItems: "center", gap: 16, height: 64 }}>
-        <Link href="/" aria-label="Vouch home" style={{ fontWeight: 700, fontSize: 22 }} className="font-display">
-          Vouch<span style={{ color: "var(--accent)" }}>.</span>
+        <Link href="/" aria-label="Vouch home" style={{ fontWeight: 700, fontSize: 22, display: "inline-flex", alignItems: "center", gap: 10 }} className="font-display">
+          <Logo size={30} />
+          <span>Vouch<span style={{ color: "var(--accent)" }}>.</span></span>
         </Link>
         <nav aria-label="Primary" className="hidden md:flex" style={{ display: "none" }}>
           <span />
