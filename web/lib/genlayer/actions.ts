@@ -46,7 +46,13 @@ async function write(
   }
   // Consensus ACCEPTED does not mean execution succeeded: a reverted call
   // (e.g. past deadline) still reaches consensus with status "rollback".
-  // Surface the contract's own error message instead of reporting success.
+  // And an UNDETERMINED round stores nothing at all. Both must surface as
+  // failures instead of false success.
+  const statusName = String((receipt as Record<string, unknown> | null)?.statusName ?? "");
+  if (/UNDETERMINED/i.test(statusName)) {
+    onStage("failed", tx);
+    throw new Error("Validators could not agree — retry verification.");
+  }
   const execError = findExecutionError(receipt);
   if (execError) {
     onStage("failed", tx);

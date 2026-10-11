@@ -68,6 +68,14 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
   const w = address && provider ? { address, provider } : null;
   const isCreator = w && deal.creator.toLowerCase() === address!.toLowerCase();
   const isBrand = w && deal.brand.toLowerCase() === address!.toLowerCase();
+  // Only terminal verdicts release money. Anything earlier must refuse with
+  // an explanation instead of submitting a doomed on-chain claim.
+  const claimable = deal.status === "APPROVED" || deal.status === "REJECTED" || deal.status === "EXPIRED";
+  const claimHint = !w
+    ? "Connect wallet"
+    : !claimable
+      ? "Available after verification: creator claims on approval, brand on rejection or expiry"
+      : "Claim funds";
 
   const act = (fn: (onStage: Parameters<Parameters<typeof run>[0]>[0]) => Promise<{ tx: string; url: string }>) => {
     void run(fn).then(() => load());
@@ -133,8 +141,17 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
         </div>
         <div style={{ background: "#101814", color: "#EAF0EC", borderRadius: 16, padding: 20 }}>
           <h2>Consensus</h2>
-          <ConsensusMeter agree={deal.consensus.agree} total={deal.consensus.total} />
-          <p style={{ fontSize: 13, opacity: 0.85, marginTop: 8 }}>{deal.verdictReason || "No verdict yet."}</p>
+          {!isLive || deal.verdictReason || (deal.status !== "SUBMITTED" && deal.status !== "VERIFYING") ? (
+            <>
+              {!isLive ? <ConsensusMeter agree={deal.consensus.agree} total={deal.consensus.total} /> : null}
+              <p style={{ fontSize: 13, opacity: 0.85, marginTop: 8 }}>{deal.verdictReason || "No verdict yet."}</p>
+            </>
+          ) : (
+            <p style={{ fontSize: 13, opacity: 0.85, marginTop: 8 }}>
+              No verification stored yet — press Run verification below. Validators open the live post and must reach
+              consensus before any verdict appears here.
+            </p>
+          )}
           <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
             {(deal.status === "SUBMITTED" || deal.status === "VERIFYING" || deal.status === "APPEALED") ? (
               <button className="btn btn-ghost" disabled={!w} style={{ color: "#fff", borderColor: "#333" }} onClick={() => w && act((s) => dealActions.verify(w, id, s))} title={w ? "Run verification" : "Connect wallet"}>
@@ -144,7 +161,7 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
             {(isBrand || isCreator) && (deal.status === "APPROVED" || deal.status === "REJECTED") ? (
               <button className="btn btn-ghost" style={{ color: "#fff", borderColor: "#333" }} onClick={() => setAppealOpen(true)}>Appeal (0.05 GEN bond)</button>
             ) : null}
-            <button className="btn btn-accent" disabled={!w} onClick={() => w && act((s) => dealActions.claim(w, id, s))} title={w ? "Claim funds" : "Connect wallet"}>
+            <button className="btn btn-accent" disabled={!w || !claimable} onClick={() => w && claimable && act((s) => dealActions.claim(w, id, s))} title={claimHint}>
               Claim funds
             </button>
           </div>
