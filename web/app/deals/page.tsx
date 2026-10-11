@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MOCK_DEALS } from "@/lib/mock";
 import { DealCard } from "@/components/DealCard";
 import { Skeleton } from "@/components/Skeleton";
@@ -14,6 +15,8 @@ const FILTERS: ("all" | DealStatus)[] = ["all", "FUNDED", "SUBMITTED", "VERIFYIN
 
 export default function DealsPage() {
   const { address } = useWallet();
+  const router = useRouter();
+  const [dealId, setDealId] = useState("");
   const [tab, setTab] = useState<(typeof TABS)[number]>("brand");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [chainDeals, setChainDeals] = useState<Deal[] | null>(null);
@@ -76,9 +79,36 @@ export default function DealsPage() {
       </div>
       {loading ? <div style={{ marginTop: 16 }}><Skeleton label="deals" /></div> : null}
       {chainError ? <p role="alert" style={{ color: "var(--danger)" }}>{chainError}</p> : null}
+      <form
+        aria-label="Open a deal by ID"
+        className="card"
+        style={{ padding: 16, marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const id = dealId.trim().toUpperCase();
+          if (id) router.push(`/deals/${encodeURIComponent(id)}`);
+        }}
+      >
+        <label htmlFor="deal-id" style={{ fontWeight: 600, fontSize: 14 }}>Got a deal link from a brand?</label>
+        <input
+          id="deal-id"
+          value={dealId}
+          onChange={(e) => setDealId(e.target.value)}
+          placeholder="VOUCH-3"
+          style={{ flex: 1, minWidth: 140, minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", background: "var(--bg)", color: "var(--ink)" }}
+        />
+        <button className="btn btn-ghost" type="submit">Open deal</button>
+      </form>
       {!loading && deals.length === 0 ? (
         <div className="card" style={{ padding: 24, marginTop: 16, textAlign: "center" }}>
-          <p>No deals here yet.</p>
+          {tab === "creator" ? (
+            <>
+              <p>No deals assigned to this wallet yet.</p>
+              <p style={{ color: "var(--ink-muted)", fontSize: 14 }}>Ask the brand for your deal link (it looks like VOUCH-3), connect the creator wallet, then paste your published post URL on the deal page to participate.</p>
+            </>
+          ) : (
+            <p>No deals here yet.</p>
+          )}
           <Link href="/deals/new" className="btn btn-accent" style={{ marginTop: 12 }}>Create a deal</Link>
         </div>
       ) : !loading ? (

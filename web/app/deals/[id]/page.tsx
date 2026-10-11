@@ -85,6 +85,40 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
         Brand {shortAddress(deal.brand)} — Creator {shortAddress(deal.creator)}
       </p>
 
+      {deal.status === "FUNDED" ? (
+        isCreator ? (
+          <div className="card" role="region" aria-label="Participate in this deal" style={{ padding: 20, marginTop: 16, borderColor: "var(--accent)", borderWidth: 2 }}>
+            <h2>Participate — submit your post link</h2>
+            <p style={{ color: "var(--ink-muted)", fontSize: 14 }}>
+              Publish your post on {deal.platform}, then paste the public URL below before the deadline.
+              Validators will check it against the brief.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+              <input
+                aria-label="Your published post URL"
+                value={postUrl}
+                onChange={(e) => setPostUrl(e.target.value)}
+                placeholder="https://…"
+                inputMode="url"
+                style={{ flex: 1, minWidth: 220, minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", background: "var(--bg)", color: "var(--ink)" }}
+              />
+              <button className="btn btn-accent" disabled={!w || postUrl.trim().length === 0} onClick={() => w && act((s) => dealActions.submitPost(w, id, postUrl.trim(), s))}>
+                Submit post
+              </button>
+            </div>
+            <TxStatus stage={stage} tx={tx} error={error} url={tx ? explorerTxUrl(tx) : undefined} />
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 20, marginTop: 16 }}>
+            <h2>Waiting on the creator</h2>
+            <p style={{ color: "var(--ink-muted)", fontSize: 14 }}>
+              Only the designated creator wallet ({shortAddress(deal.creator)}) can submit the post link for this deal.
+              {!w ? " Connect that wallet to participate." : " Switch to the creator wallet to participate."}
+            </p>
+          </div>
+        )
+      ) : null}
+
       <div style={{ display: "grid", gap: 16, marginTop: 16 }} className="hero-grid">
         <div className="card" style={{ padding: 20 }}>
           <h2>Brief</h2>
@@ -102,12 +136,6 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
           <ConsensusMeter agree={deal.consensus.agree} total={deal.consensus.total} />
           <p style={{ fontSize: 13, opacity: 0.85, marginTop: 8 }}>{deal.verdictReason || "No verdict yet."}</p>
           <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
-            {isCreator && deal.status === "FUNDED" ? (
-              <div style={{ display: "flex", gap: 8 }}>
-                <input aria-label="Post URL" value={postUrl} onChange={(e) => setPostUrl(e.target.value)} placeholder="https://…" style={{ flex: 1, minHeight: 44, borderRadius: 10, padding: "0 12px" }} />
-                <button className="btn btn-accent" disabled={!w} onClick={() => w && act((s) => dealActions.submitPost(w, id, postUrl, s))}>Submit</button>
-              </div>
-            ) : null}
             {(deal.status === "SUBMITTED" || deal.status === "VERIFYING" || deal.status === "APPEALED") ? (
               <button className="btn btn-ghost" disabled={!w} style={{ color: "#fff", borderColor: "#333" }} onClick={() => w && act((s) => dealActions.verify(w, id, s))} title={w ? "Run verification" : "Connect wallet"}>
                 Run verification
