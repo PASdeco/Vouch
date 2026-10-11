@@ -55,8 +55,8 @@ export default function Home() {
           <p style={{ fontSize: 13, color: "var(--ink-muted)", marginBottom: 12 }}>Prefills the full form — nothing is signed here.</p>
           <form action="/deals/new" method="get" style={{ display: "grid", gap: 12 }}>
             <label style={{ display: "grid", gap: 6, fontSize: 14 }}>
-              Creator handle
-              <input name="creator" placeholder="@creator" autoComplete="off" style={{ minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", background: "var(--bg)", color: "var(--ink)" }} />
+              Creator wallet address
+              <input name="creator" placeholder="0x…" autoComplete="off" style={{ minHeight: 44, borderRadius: 10, border: "1px solid var(--border)", padding: "0 12px", background: "var(--bg)", color: "var(--ink)" }} />
             </label>
             <label style={{ display: "grid", gap: 6, fontSize: 14 }}>
               Brief
