@@ -42,6 +42,8 @@ function toDeal(raw: unknown): Deal {
     consensus: { agree: 0, total: 3 },
     verdictReason: String(d.verdict_reason ?? ""),
     updatedAt: new Date(Number(d.verified_at || d.created_at) * 1000).toISOString(),
+    recheckOk: Number(d.recheck_ok ?? 0) === 1,
+    appealDeadline: Number(d.appeal_deadline ?? 0),
   });
 }
 

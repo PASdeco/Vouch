@@ -39,6 +39,8 @@ class DealRecord:
     appeal_deadline: u64
     appeal_bond: u256
     appeal_payer: str
+    recheck_ok: u64
+    rechecked_at: u64
     requirements_json: str
     history_json: str
 
@@ -118,6 +120,8 @@ class VouchEscrow(gl.Contract):
             appeal_deadline=u64(0),
             appeal_bond=u256(0),
             appeal_payer="",
+            recheck_ok=u64(0),
+            rechecked_at=u64(0),
             requirements_json=json.dumps(reqs),
             history_json=json.dumps([{"status": "FUNDED", "at": now, "by": brand}]),
         )
@@ -177,6 +181,9 @@ class VouchEscrow(gl.Contract):
         record.verdict_reason = reason
         record.evidence_summary = evidence
         record.requirements_json = json.dumps(verdict_reqs)
+        # A fresh verdict voids any earlier end-of-window recheck.
+        record.recheck_ok = u64(0)
+        record.rechecked_at = u64(0)
         if overall == "APPROVE":
             record.status = "APPROVED"
             record.appeal_deadline = u64(now + 3 * 86400)
@@ -217,9 +224,12 @@ class VouchEscrow(gl.Contract):
             record.status = "REJECTED"
             record.verdict = "REJECT"
             record.verdict_reason = "Post no longer live at recheck."
+            record.recheck_ok = u64(0)
             self._append_history(record, "REJECTED", str(gl.message.sender_address))
             self.deals[deal_id] = record
         else:
+            record.recheck_ok = u64(1)
+            record.rechecked_at = u64(self._now())
             self._append_history(record, "APPROVED", str(gl.message.sender_address))
             self.deals[deal_id] = record
         return self._public_view(record)
@@ -247,6 +257,8 @@ class VouchEscrow(gl.Contract):
         record.appeal_count = u64(int(record.appeal_count) + 1)
         record.status = "APPEALED"
         record.verdict = "NONE"
+        record.recheck_ok = u64(0)
+        record.rechecked_at = u64(0)
         self._append_history(record, "APPEALED", caller)
         self.deals[deal_id] = record
         return self._public_view(record)
@@ -261,9 +273,13 @@ class VouchEscrow(gl.Contract):
         if record.status == "APPROVED":
             if caller.lower() != record.creator.lower():
                 raise gl.vm.UserError("[EXPECTED] Only the creator can claim an approval.")
+            if int(record.appeal_deadline) <= 0 or now < int(record.appeal_deadline):
+                raise gl.vm.UserError("[EXPECTED] Appeal window still open; claim after it closes.")
             required_at = int(record.submitted_at) + int(record.min_live_days) * 86400
             if int(record.min_live_days) > 0 and now < required_at:
                 raise gl.vm.UserError("[EXPECTED] Live window not elapsed; call recheck_live after N days.")
+            if int(record.recheck_ok) != 1:
+                raise gl.vm.UserError("[EXPECTED] End-of-window recheck required before payout; call recheck_live first.")
             amount = record.amount
             bond = record.appeal_bond
             record.claimed = u64(1)
@@ -278,6 +294,9 @@ class VouchEscrow(gl.Contract):
         if record.status == "REJECTED" or record.status == "EXPIRED":
             if caller.lower() != record.brand.lower():
                 raise gl.vm.UserError("[EXPECTED] Only the brand can claim a refund.")
+            if record.status == "REJECTED":
+                if int(record.appeal_deadline) <= 0 or now < int(record.appeal_deadline):
+                    raise gl.vm.UserError("[EXPECTED] Appeal window still open; claim after it closes.")
             amount = record.amount
             bond = record.appeal_bond
             record.claimed = u64(1)
@@ -404,6 +423,8 @@ class VouchEscrow(gl.Contract):
             "claimed": int(record.claimed),
             "appeal_deadline": int(record.appeal_deadline),
             "appeal_bond": int(record.appeal_bond),
+            "recheck_ok": int(record.recheck_ok),
+            "rechecked_at": int(record.rechecked_at),
             "requirements": reqs,
             "history": hist,
         }
@@ -487,7 +508,7 @@ class VouchEscrow(gl.Contract):
             response = gl.nondet.web.get(url)
             page = response.body.decode("utf-8", errors="ignore")
         except Exception:
-            return {"live": False, "requirements": self._all_unclear(reqs), "overall": "REJECT", "reason": "Post unreachable.", "evidence": "Fetch failed."}
+            return {"live": False, "requirements": self._all_unclear(reqs), "overall": "UNCLEAR", "reason": "Post unreachable; fetch failed, no evidence either way.", "evidence": "Fetch failed."}
         if len(page) > 8000:
             page = page[:8000]
         req_ids = []

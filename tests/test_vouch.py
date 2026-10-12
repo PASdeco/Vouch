@@ -53,6 +53,11 @@ def install_llm(direct_vm, payload):
     direct_vm.mock_llm(r".*", payload)
 
 
+def install_live_mock(direct_vm):
+    body = "<html><body>" + "product demo mention #ad live content " * 20 + "</body></html>"
+    direct_vm.mock_web(r"youtube\.com.*", {"status": 200, "body": body})
+
+
 def test_create_deal_happy(direct_vm, vouch_contract, direct_alice, direct_bob):
     creator = addr_hex(direct_bob)
     deal = make_deal(direct_vm, vouch_contract, creator)
@@ -195,8 +200,14 @@ def test_appeal_and_claim_creator(direct_vm, vouch_contract, direct_alice, direc
     direct_vm.value = 0
     vouch_contract.verify(deal["id"])
     from datetime import datetime, timezone, timedelta
-    future = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+    future = (datetime.now(timezone.utc) + timedelta(days=4)).isoformat()
     direct_vm.warp(future)
+    direct_vm.clear_mocks()
+    install_live_mock(direct_vm)
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    rechecked = vouch_contract.recheck_live(deal["id"])
+    assert rechecked["recheck_ok"] == 1
     direct_vm.deal(direct_vm._contract_address, 2 * ONE_GEN)
     direct_vm.sender = direct_bob
     direct_vm.value = 0
@@ -228,3 +239,133 @@ def test_views_and_stats(direct_vm, vouch_contract, direct_alice, direct_bob):
     assert len(vouch_contract.list_deals_by_brand(brand)) == 1
     assert len(vouch_contract.list_deals_by_creator(creator)) == 1
     assert vouch_contract.get_stats()["deal_count"] == 1
+
+
+def approve_deal(direct_vm, vouch_contract, direct_alice, direct_bob, live_days=1):
+    """Helper: brand creates, creator submits, validators approve."""
+    creator = addr_hex(direct_bob)
+    deal = make_deal(direct_vm, vouch_contract, creator, live_days=live_days)
+    submit(direct_vm, vouch_contract, direct_bob, deal["id"])
+    install_llm(direct_vm, eval_json("APPROVE"))
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    out = vouch_contract.verify(deal["id"])
+    assert out["status"] == "APPROVED"
+    return out
+
+
+def test_fetch_failure_yields_non_settling_unclear(direct_vm, vouch_contract, direct_alice, direct_bob):
+    creator = addr_hex(direct_bob)
+    deal = make_deal(direct_vm, vouch_contract, creator)
+    submit(direct_vm, vouch_contract, direct_bob, deal["id"])
+    # No web mock registered: the fetch raises inside the nondet block.
+    direct_vm.mock_llm(r".*", eval_json("APPROVE"))
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    out = vouch_contract.verify(deal["id"])
+    assert out["status"] == "VERIFYING"
+    assert out["verdict"] == "UNCLEAR"
+    # Escrow is untouched: nothing paid, nothing refunded, unclaimed.
+    stats = vouch_contract.get_stats()
+    assert stats["total_paid"] == 0
+    assert stats["total_refunded"] == 0
+    assert out["claimed"] == 0
+
+
+def test_claim_blocked_during_appeal_window(direct_vm, vouch_contract, direct_alice, direct_bob):
+    deal = approve_deal(direct_vm, vouch_contract, direct_alice, direct_bob)
+    direct_vm.sender = direct_bob
+    direct_vm.value = 0
+    with pytest.raises(Exception, match="Appeal window still open"):
+        vouch_contract.claim(deal["id"])
+    stats = vouch_contract.get_stats()
+    assert stats["total_paid"] == 0
+    assert vouch_contract.get_deal(deal["id"])["claimed"] == 0
+
+
+def test_claim_blocked_without_successful_recheck(direct_vm, vouch_contract, direct_alice, direct_bob):
+    from datetime import datetime, timezone, timedelta
+    deal = approve_deal(direct_vm, vouch_contract, direct_alice, direct_bob)
+    future = (datetime.now(timezone.utc) + timedelta(days=4)).isoformat()
+    direct_vm.warp(future)
+    direct_vm.sender = direct_bob
+    direct_vm.value = 0
+    with pytest.raises(Exception, match="recheck"):
+        vouch_contract.claim(deal["id"])
+    stats = vouch_contract.get_stats()
+    assert stats["total_paid"] == 0
+    assert vouch_contract.get_deal(deal["id"])["status"] == "APPROVED"
+
+
+def test_recheck_then_claim_moves_escrow(direct_vm, vouch_contract, direct_alice, direct_bob):
+    from datetime import datetime, timezone, timedelta
+    deal = approve_deal(direct_vm, vouch_contract, direct_alice, direct_bob)
+    future = (datetime.now(timezone.utc) + timedelta(days=4)).isoformat()
+    direct_vm.warp(future)
+    direct_vm.clear_mocks()
+    install_live_mock(direct_vm)
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    rechecked = vouch_contract.recheck_live(deal["id"])
+    assert rechecked["recheck_ok"] == 1
+    assert rechecked["rechecked_at"] > 0
+    direct_vm.deal(direct_vm._contract_address, 2 * ONE_GEN)
+    direct_vm.sender = direct_bob
+    direct_vm.value = 0
+    claimed = vouch_contract.claim(deal["id"])
+    assert claimed["status"] == "PAID"
+    assert vouch_contract.get_stats()["total_paid"] == ONE_GEN
+
+
+def test_rejected_claim_blocked_during_appeal_window(direct_vm, vouch_contract, direct_alice, direct_bob):
+    from datetime import datetime, timezone, timedelta
+    creator = addr_hex(direct_bob)
+    deal = make_deal(direct_vm, vouch_contract, creator, live_days=1)
+    submit(direct_vm, vouch_contract, direct_bob, deal["id"])
+    install_llm(direct_vm, eval_json("REJECT", [
+        {"id": "mention", "met": True},
+        {"id": "oncamera", "met": False},
+        {"id": "disclose", "met": False},
+        {"id": "live", "met": True},
+    ], "Missing proof."))
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    out = vouch_contract.verify(deal["id"])
+    assert out["status"] == "REJECTED"
+    with pytest.raises(Exception, match="Appeal window still open"):
+        vouch_contract.claim(deal["id"])
+    assert vouch_contract.get_stats()["total_refunded"] == 0
+    future = (datetime.now(timezone.utc) + timedelta(days=4)).isoformat()
+    direct_vm.warp(future)
+    direct_vm.deal(direct_vm._contract_address, 2 * ONE_GEN)
+    direct_vm.value = 0
+    claimed = vouch_contract.claim(deal["id"])
+    assert claimed["status"] == "REFUNDED"
+
+
+def test_appeal_resets_persisted_recheck(direct_vm, vouch_contract, direct_alice, direct_bob):
+    from datetime import datetime, timezone, timedelta
+    deal = approve_deal(direct_vm, vouch_contract, direct_alice, direct_bob)
+    future = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+    direct_vm.warp(future)
+    direct_vm.clear_mocks()
+    install_live_mock(direct_vm)
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    assert vouch_contract.recheck_live(deal["id"])["recheck_ok"] == 1
+    # Appeal inside the window must void the earlier recheck.
+    direct_vm.sender = direct_bob
+    direct_vm.value = int(0.05 * ONE_GEN)
+    appealed = vouch_contract.appeal(deal["id"])
+    assert appealed["recheck_ok"] == 0
+    direct_vm.clear_mocks()
+    install_llm(direct_vm, eval_json("APPROVE"))
+    direct_vm.sender = direct_alice
+    direct_vm.value = 0
+    vouch_contract.verify(deal["id"])
+    future2 = (datetime.now(timezone.utc) + timedelta(days=5)).isoformat()
+    direct_vm.warp(future2)
+    direct_vm.sender = direct_bob
+    direct_vm.value = 0
+    with pytest.raises(Exception, match="recheck"):
+        vouch_contract.claim(deal["id"])

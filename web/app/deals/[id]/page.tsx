@@ -70,12 +70,20 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
   const isBrand = w && deal.brand.toLowerCase() === address!.toLowerCase();
   // Only terminal verdicts release money. Anything earlier must refuse with
   // an explanation instead of submitting a doomed on-chain claim.
-  const claimable = deal.status === "APPROVED" || deal.status === "REJECTED" || deal.status === "EXPIRED";
+  // APPROVED additionally needs a settled appeal window plus a persisted
+  // successful end-of-window recheck; REJECTED needs a settled window.
+  const terminal = deal.status === "APPROVED" || deal.status === "REJECTED" || deal.status === "EXPIRED";
+  const appealSettled = deal.appealDeadline === 0 || Math.floor(Date.now() / 1000) >= deal.appealDeadline;
+  const claimable = terminal && appealSettled && (deal.status !== "APPROVED" || deal.recheckOk);
   const claimHint = !w
     ? "Connect wallet"
-    : !claimable
+    : !terminal
       ? "Available after verification: creator claims on approval, brand on rejection or expiry"
-      : "Claim funds";
+      : !appealSettled
+        ? "Claim unlocks after the appeal window closes"
+        : deal.status === "APPROVED" && !deal.recheckOk
+          ? "Run the end-of-window recheck first, then claim"
+          : "Claim funds";
 
   const act = (fn: (onStage: Parameters<Parameters<typeof run>[0]>[0]) => Promise<{ tx: string; url: string }>) => {
     void run(fn).then(() => load());
@@ -156,6 +164,16 @@ export default function DealDetail({ params }: { params: Promise<{ id: string }>
             {(deal.status === "SUBMITTED" || deal.status === "VERIFYING" || deal.status === "APPEALED") ? (
               <button className="btn btn-ghost" disabled={!w} style={{ color: "#fff", borderColor: "#333" }} onClick={() => w && act((s) => dealActions.verify(w, id, s))} title={w ? "Run verification" : "Connect wallet"}>
                 Run verification
+              </button>
+            ) : null}
+            {deal.status === "APPROVED" ? (
+              <p style={{ fontSize: 13, opacity: 0.85 }}>
+                End-of-window recheck: {deal.recheckOk ? "passed — creator payout unlocked once the appeal window closes." : "pending — required before creator payout."}
+              </p>
+            ) : null}
+            {deal.status === "APPROVED" && !deal.recheckOk ? (
+              <button className="btn btn-ghost" disabled={!w} style={{ color: "#fff", borderColor: "#333" }} onClick={() => w && act((s) => dealActions.recheck(w, id, s))} title={w ? "Re-verify the post is still live after the window" : "Connect wallet"}>
+                Recheck live window
               </button>
             ) : null}
             {(isBrand || isCreator) && (deal.status === "APPROVED" || deal.status === "REJECTED") ? (

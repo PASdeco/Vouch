@@ -37,6 +37,8 @@ export const DealSchema = z.object({
     .default({ agree: 0, total: 3 }),
   verdictReason: z.string().default(""),
   updatedAt: z.string(),
+  recheckOk: z.boolean().default(false),
+  appealDeadline: z.number().default(0),
 });
 export type Deal = z.infer<typeof DealSchema>;
 

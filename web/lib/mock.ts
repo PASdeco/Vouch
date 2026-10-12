@@ -21,6 +21,8 @@ export const MOCK_DEALS: Deal[] = [
     consensus: { agree: 2, total: 3 },
     verdictReason: "Validators confirm mention + on-camera. #ad disclosure unclear from excerpt — 3rd vote pending.",
     updatedAt: new Date().toISOString(),
+    recheckOk: false,
+    appealDeadline: 0,
   },
   {
     id: "VOUCH-1041",
@@ -40,6 +42,8 @@ export const MOCK_DEALS: Deal[] = [
     consensus: { agree: 0, total: 3 },
     verdictReason: "",
     updatedAt: new Date().toISOString(),
+    recheckOk: false,
+    appealDeadline: 0,
   },
 ];
 
