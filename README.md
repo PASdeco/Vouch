@@ -18,7 +18,7 @@ Why GenLayer: the judgment is subjective and needs live web access — something
 
 | Item | Value |
 |---|---|
-| Contract | `0xab8E0Be92141F7bD267dC88E6904aA15519B9650` |
+| Contract | `0x2Ec9C7C883b9B13eCAD5D7Ea16A5c7070Bf2dd27` |
 | Network | StudioNet — RPC `https://studio.genlayer.com/api`, chain `61999` |
 | Explorer | `https://explorer-studio.genlayer.com` |
 | Funds | Demo GEN only — no real value |

@@ -29,3 +29,10 @@
 - **Real deal VOUCH-1** (brand=creator=deployer, 0.01 GEN, youtube): create + submit ACCEPTED; first `verify` → UNDETERMINED (YouTube bot-fetch varies by node — known platform risk); retry → consensus **UNCLEAR** stored on-chain ("generic About page, no evidence") with status VERIFYING. Proves fetch→LLM→equivalence→storage pipeline; UNCLEAR correctly moves no money.
 - **Deviation:** hosted Studionet lacks `gen_getContractState/Code/Schema` (code -32603); reads/writes via `genlayer-js` `gen_call` work fine (used for all smoke ops).
 - **min_live_days choice:** single escrow + `recheck_live` gate before `claim` (no tranches); documented in ARCHITECTURE.
+
+## 2026-10-11 — Reviewer corrections redeployed on StudioNet
+- **Contract:** `contracts/vouch_escrow.py` → `0x2Ec9C7C883b9B13eCAD5D7Ea16A5c7070Bf2dd27`
+  deploy tx `0x3fc6868320d2f6ad1f95766186e0adb1b58e931070a343e33064d070e93bbabb` (FINALIZED, 3/5 agree, execution SUCCESS; deployed bytecode contains the new `recheck_ok`/`rechecked_at` fields).
+- Reviewer demands implemented: (1) fetch failures settle as non-paying `UNCLEAR`, never `REJECT`; (2) `APPROVED`/`REJECTED` claims wait for the 3-day appeal deadline; (3) creator payout requires a persisted successful `recheck_live`, voided by any appeal; recheck exposed in the deal UI with claim gating.
+- **Lint:** 0 errors, 0 warnings. **Tests:** 17/17 direct-mode pass, including six new proofs that fetch faults, early claims and missing rechecks cannot move escrow (`total_paid`/`total_refunded` stay 0 on every blocked path).
+- Previous deployment `0xab8E…9650` (5 deals, pre-correction code) is superseded; frontend env + README now target the new address.

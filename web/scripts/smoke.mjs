@@ -19,7 +19,7 @@ loadDotEnv("../.env");
 try { loadDotEnv("C:\\Vibecode\\Vouch\\.env"); } catch {}
 if (!process.env.BACKEND_PRIVATE_KEY) loadDotEnv("C:\\Vibecode\\Roast\\.env");
 
-const address = process.env.VOUCH_CONTRACT_ADDRESS || "0xab8E0Be92141F7bD267dC88E6904aA15519B9650";
+const address = process.env.VOUCH_CONTRACT_ADDRESS || "0x2Ec9C7C883b9B13eCAD5D7Ea16A5c7070Bf2dd27";
 const account = createAccount(process.env.BACKEND_PRIVATE_KEY);
 const client = createClient({ chain: studionet, account });
 console.log(`deployer/brand/creator: ${account.address}`);
